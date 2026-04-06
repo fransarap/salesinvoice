@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Item Computation System</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body { background:#fff; }
+
+.header {
+    background:#000;
+    color:#fff;
+    padding:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:14px;
+}
+
+.desktop-force {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+}
+
+.left-panel { width:65%; }
+.right-panel { width:35%; }
+
+.btn-yellow {
+    background:#ffc107;
+    color:#000;
+    font-weight:bold;
+}
+
+.item-row { border-left:4px solid #ffc107; }
+
+.summary-box {
+    background:#000;
+    color:#fff;
+    padding:12px;
+    border-radius:10px;
+    height:85vh;
+    overflow:auto;
+}
+
+@media (max-width:768px){
+    body { font-size:12px; }
+    .btn { font-size:12px; padding:6px; }
+    .summary-box { font-size:11px; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div>Item Computation System</div>
+    <button class="btn btn-sm btn-danger" onclick="clearAll()">🧹 Clear</button>
+</div>
+
+<div class="container mt-2">
+<div class="desktop-force">
+
+<!-- LEFT -->
+<div class="left-panel pe-2">
+
+<div class="card p-2 mb-2">
+    <label><strong>How many items?</strong></label>
+    <input type="number" id="itemCount" class="form-control mb-1">
+    <button class="btn btn-yellow w-100" onclick="generateItems()">Generate</button>
+</div>
+
+<div id="itemsContainer"></div>
+
+<button class="btn btn-yellow w-100 mt-2" onclick="addItem()">+ Add More Item</button>
+
+</div>
+
+<!-- RIGHT -->
+<div class="right-panel">
+
+<div class="summary-box">
+
+<h6 class="text-warning">Summary</h6>
+<hr>
+
+<div id="breakdown"></div>
+
+<hr>
+
+<p>Total Items: <span id="totalItems">0</span></p>
+<p>Total Quantity: <span id="totalQty">0</span></p>
+<p><b>Total Amount:</b> ₱ <span id="grandTotal">0.00</span></p>
+
+<hr>
+
+<p>Less VAT: ₱ <span id="vatAmount">0.00</span></p>
+<p>Net of VAT: ₱ <span id="netVat">0.00</span></p>
+
+<hr>
+
+<button class="btn btn-yellow w-100 mb-2" onclick="toggleVat()">+ Add VAT (Kung wala pang vat yung mga item ay click ito) </button>
+
+<div id="vatSummary" style="display:none;">
+    <hr>
+    <h6 class="text-warning">With VAT Summary</h6>
+    <p><b>Total w/ VAT:</b> ₱ <span id="totalWithVat">0.00</span></p>
+    <p>Less VAT: ₱ <span id="vat2">0.00</span></p>
+    <p>Net of VAT: ₱ <span id="net2">0.00</span></p>
+</div>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+<!-- FOOTER CREDIT -->
+<div class="text-center mt-3 mb-2" style="font-size:11px; color:#888;">
+    <hr style="margin-bottom:5px;">
+    <div>
+        © 2026 | Crafted with precision by <strong style="color:#000;">Francis Isaac Ferrer</strong>
+    </div>
+</div>
+
+<script>
+
+function peso(num){
+    return num.toLocaleString('en-PH',{
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+    });
+}
+
+function saveData(){
+    let data=[];
+    document.querySelectorAll(".item-row").forEach(row=>{
+        data.push({
+            qty: row.querySelector(".qty").value,
+            price: row.querySelector(".price").value
+        });
+    });
+    localStorage.setItem("itemsData", JSON.stringify(data));
+}
+
+function loadData(){
+    let data = JSON.parse(localStorage.getItem("itemsData")) || [];
+    if(data.length){
+        generateItems(data.length, data);
+    }
+}
+
+function generateItems(count=null, saved=[]){
+    if(!count){
+        count = document.getElementById("itemCount").value;
+    }
+
+    let container = document.getElementById("itemsContainer");
+    container.innerHTML = "";
+
+    for(let i=0;i<count;i++){
+        createRow(i+1, saved[i]);
+    }
+
+    updateAll();
+}
+
+function createRow(index, data={}){
+    let container = document.getElementById("itemsContainer");
+
+    let div = document.createElement("div");
+    div.className = "card p-2 mb-2 item-row";
+
+    div.innerHTML = `
+    <div class="d-flex justify-content-between">
+        <strong>Item ${index}</strong>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem(this)">✖</button>
+    </div>
+
+    <div class="row mt-1">
+        <div class="col-6">
+            <input type="number" placeholder="Qty" value="${data?.qty||""}" class="form-control qty" oninput="updateAll()" onkeydown="nextInput(event)">
+        </div>
+        <div class="col-6">
+            <input type="number" placeholder="Price" value="${data?.price||""}" class="form-control price" oninput="updateAll()" onkeydown="nextInput(event)">
+        </div>
+    </div>
+    `;
+
+    container.appendChild(div);
+}
+
+function addItem(){
+    let count = document.querySelectorAll(".item-row").length;
+    createRow(count+1);
+    reindex();
+    updateAll();
+}
+
+function deleteItem(btn){
+    btn.closest(".item-row").remove();
+    reindex();
+    updateAll();
+}
+
+function clearAll(){
+    if(confirm("Clear all items?")){
+
+        localStorage.removeItem("itemsData");
+
+        document.getElementById("itemsContainer").innerHTML = "";
+        document.getElementById("itemCount").value = "";
+
+        document.getElementById("breakdown").innerHTML = "";
+        document.getElementById("totalItems").innerText = 0;
+        document.getElementById("totalQty").innerText = 0;
+        document.getElementById("grandTotal").innerText = "0.00";
+        document.getElementById("netVat").innerText = "0.00";
+        document.getElementById("vatAmount").innerText = "0.00";
+
+        document.getElementById("vatSummary").style.display = "none";
+        document.getElementById("totalWithVat").innerText = "0.00";
+        document.getElementById("vat2").innerText = "0.00";
+        document.getElementById("net2").innerText = "0.00";
+
+        vatVisible = false;
+        currentTotal = 0;
+    }
+}
+
+function reindex(){
+    let rows = document.querySelectorAll(".item-row");
+    rows.forEach((row,i)=>{
+        row.querySelector("strong").innerText = "Item " + (i+1);
+    });
+    document.getElementById("totalItems").innerText = rows.length;
+}
+
+function nextInput(e){
+    if(e.key === "Enter"){
+        e.preventDefault();
+        let inputs = [...document.querySelectorAll("input")];
+        let i = inputs.indexOf(e.target);
+        if(inputs[i+1]) inputs[i+1].focus();
+    }
+}
+
+let vatVisible = false;
+let currentTotal = 0;
+
+function toggleVat(){
+    vatVisible = !vatVisible;
+
+    let totalWithVat = currentTotal * 1.12;
+    let net = totalWithVat / 1.12;
+    let vat = totalWithVat - net;
+
+    document.getElementById("vatSummary").style.display = vatVisible ? "block" : "none";
+
+    document.getElementById("totalWithVat").innerText = peso(totalWithVat);
+    document.getElementById("vat2").innerText = peso(vat);
+    document.getElementById("net2").innerText = peso(net);
+}
+
+function updateAll(){
+    let rows = document.querySelectorAll(".item-row");
+
+    let totalQty = 0;
+    let total = 0;
+    let breakdownHTML = "";
+
+    rows.forEach((row,i)=>{
+        let q = parseFloat(row.querySelector(".qty").value) || 0;
+        let p = parseFloat(row.querySelector(".price").value) || 0;
+        let sub = q * p;
+
+        totalQty += q;
+        total += sub;
+
+        if(q>0 || p>0){
+            breakdownHTML += `
+            <div>
+                Item ${i+1}: ${q} × ${peso(p)} = <b>₱ ${peso(sub)}</b>
+            </div>`;
+        }
+    });
+
+    currentTotal = total;
+
+    let net = total / 1.12;
+    let vat = total - net;
+
+    document.getElementById("breakdown").innerHTML = breakdownHTML;
+    document.getElementById("totalItems").innerText = rows.length;
+    document.getElementById("totalQty").innerText = totalQty;
+    document.getElementById("grandTotal").innerText = peso(total);
+
+    document.getElementById("netVat").innerText = peso(net);
+    document.getElementById("vatAmount").innerText = peso(vat);
+
+    saveData();
+}
+
+window.onload = loadData;
+
+</script>
+
+</body>
+</html>
